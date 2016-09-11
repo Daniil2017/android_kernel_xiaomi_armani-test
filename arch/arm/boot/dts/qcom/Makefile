@@ -163,7 +163,11 @@ dtb-$(CONFIG_ARCH_MSM8916) += msm8916-sim.dtb \
 	msm8929-qrd-skul.dtb \
 	msm8929-qrd-skulb.dtb \
 	msm8929-cdp-jdi.dtb
-dtb-$(CONFIG_ARCH_MSM8226) += msm8226-sim.dtb \
+ifeq ($(CONFIG_XIAOMI_ARMANI_DTB),y)
+	dtb-$(CONFIG_ARCH_MSM8226)	+= msm8226-h2a.dtb
+else
+dtb-$(CONFIG_ARCH_MSM8226) += \
+        msm8226-sim.dtb \
 	msm8226-fluid.dtb \
 	msm8226-v1-cdp.dtb \
 	msm8226-v1-w-cdp.dtb \
@@ -208,6 +212,7 @@ dtb-$(CONFIG_ARCH_MSM8226) += msm8226-sim.dtb \
 	apq8026-v2-720p-mtp.dtb \
 	apq8026-v2-320p-w-mtp.dtb \
 	apq8026-v2-1080p-mtp.dtb
+endif
 dtb-$(CONFIG_ARCH_MSM8610) += msm8610-rumi.dtb \
 	msm8610-v1-cdp.dtb \
 	msm8610-v2-cdp.dtb \
