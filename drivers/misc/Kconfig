@@ -560,6 +560,13 @@ config TSIF_DEBUG
 	---help---
 	  This turns on debugging information for the tsif driver
 
+config HAPTIC_ISA1000
+	tristate "ISA1000 haptic support"
+	depends on ANDROID_TIMED_OUTPUT
+	default n
+	help
+	  The ISA1000 is a high performance enhanced haptic driver.
+
 config HAPTIC_ISA1200
 	tristate "ISA1200 haptic support"
 	depends on I2C
@@ -655,4 +662,5 @@ source "drivers/misc/altera-stapl/Kconfig"
 source "drivers/misc/mei/Kconfig"
 source "drivers/misc/vmw_vmci/Kconfig"
 source "drivers/misc/qcom/Kconfig"
+
 endmenu

@@ -55,72 +55,61 @@ static struct of_device_id w1_gpio_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, w1_gpio_dt_ids);
 #endif
 
-static int w1_gpio_probe_dt(struct platform_device *pdev)
+static int w1_gpio_probe_dt(struct device_node *node, 
+			struct w1_gpio_platform_data *pdata)
 {
-	struct w1_gpio_platform_data *pdata = pdev->dev.platform_data;
-	struct device_node *np = pdev->dev.of_node;
+	char *key;
+	int ret;
+	unsigned int is_open_drain;
+	
+	key = "qcom,gpio-pin";
+	ret = of_property_read_u32(node, key, &(pdata->pin));
+	if (ret) {
+                pr_err("%s: missing DT key '%s'\n", __func__, key);
+                return ret;
+	}
 
-	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-	if (!pdata)
-		return -ENOMEM;
-
-	if (of_get_property(np, "linux,open-drain", NULL))
-		pdata->is_open_drain = 1;
-
-	pdata->pin = of_get_gpio(np, 0);
-	pdata->ext_pullup_enable_pin = of_get_gpio(np, 1);
-	pdev->dev.platform_data = pdata;
-
+	pr_info("gpio %d\n", pdata->pin);	
+	key = "qcom,is-open-drain";
+	ret = of_property_read_u32(node, key, &(is_open_drain));
+	if (ret) {
+                pr_err("%s: missing DT key '%s'\n", __func__, key);
+                return ret;
+	}
+	pdata->is_open_drain = is_open_drain?1:0;
+	
 	return 0;
 }
 
 static int w1_gpio_probe(struct platform_device *pdev)
 {
 	struct w1_bus_master *master;
-	struct w1_gpio_platform_data *pdata;
-	struct pinctrl *pinctrl;
-	int err;
-
-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-	if (IS_ERR(pinctrl))
-		dev_warn(&pdev->dev, "unable to select pin group\n");
-
-	if (of_have_populated_dt()) {
-		err = w1_gpio_probe_dt(pdev);
-		if (err < 0) {
-			dev_err(&pdev->dev, "Failed to parse DT\n");
-			return err;
-		}
-	}
-
-	pdata = pdev->dev.platform_data;
+	struct w1_gpio_platform_data *pdata = pdev->dev.platform_data;
+	int err = 0;
+	struct device_node *node;
 
 	if (!pdata) {
-		dev_err(&pdev->dev, "No configuration data\n");
-		return -ENXIO;
+                pdata = kzalloc(sizeof(struct w1_gpio_platform_data), GFP_KERNEL);
+                if (!pdata)
+                        return -ENOMEM;
+                pdev->dev.platform_data =(void *) pdata;
+	}
+	
+	node = pdev->dev.of_node;
+	/* parse dt */
+	err = w1_gpio_probe_dt(node, pdata);
+	if (err) {
+		pr_err("%s: failed to parse DT \n", __func__);
+		goto free_pdata;
 	}
 
 	master = kzalloc(sizeof(struct w1_bus_master), GFP_KERNEL);
-	if (!master) {
-		dev_err(&pdev->dev, "Out of memory\n");
+	if (!master)
 		return -ENOMEM;
-	}
 
 	err = gpio_request(pdata->pin, "w1");
-	if (err) {
-		dev_err(&pdev->dev, "gpio_request (pin) failed\n");
+	if (err)
 		goto free_master;
-	}
-
-	if (gpio_is_valid(pdata->ext_pullup_enable_pin)) {
-		err = gpio_request_one(pdata->ext_pullup_enable_pin,
-				       GPIOF_INIT_LOW, "w1 pullup");
-		if (err < 0) {
-			dev_err(&pdev->dev, "gpio_request_one "
-					"(ext_pullup_enable_pin) failed\n");
-			goto free_gpio;
-		}
-	}
 
 	master->data = pdata;
 	master->read_bit = w1_gpio_read_bit;
@@ -134,28 +123,22 @@ static int w1_gpio_probe(struct platform_device *pdev)
 	}
 
 	err = w1_add_master_device(master);
-	if (err) {
-		dev_err(&pdev->dev, "w1_add_master device failed\n");
-		goto free_gpio_ext_pu;
-	}
+	if (err)
+		goto free_gpio;
 
 	if (pdata->enable_external_pullup)
 		pdata->enable_external_pullup(1);
-
-	if (gpio_is_valid(pdata->ext_pullup_enable_pin))
-		gpio_set_value(pdata->ext_pullup_enable_pin, 1);
 
 	platform_set_drvdata(pdev, master);
 
 	return 0;
 
- free_gpio_ext_pu:
-	if (gpio_is_valid(pdata->ext_pullup_enable_pin))
-		gpio_free(pdata->ext_pullup_enable_pin);
  free_gpio:
 	gpio_free(pdata->pin);
  free_master:
 	kfree(master);
+ free_pdata:
+	kfree(pdata);
 
 	return err;
 }
