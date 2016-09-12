@@ -51,6 +51,10 @@
 #include <linux/qcom_iommu.h>
 #include <linux/msm_iommu_domains.h>
 
+#ifdef CONFIG_LLCON
+#include <video/llcon.h>
+#endif
+
 #include "mdss_fb.h"
 #include "mdss_mdp_splash_logo.h"
 #define CREATE_TRACE_POINTS
@@ -3794,6 +3798,14 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 	pdata = dev_get_platdata(&mfd->pdev->dev);
 	if (!pdata || pdata->panel_info.dynamic_switch_pending)
 		return -EPERM;
+
+#ifdef CONFIG_LLCON
+	if ( cmd != MSMFB_OVERLAY_VSYNC_CTRL
+	  && cmd != MSMFB_METADATA_GET
+	  && cmd != MSMFB_DISPLAY_COMMIT ) {
+		llcon_exit();
+	}
+#endif
 
 	atomic_inc(&mfd->ioctl_ref_cnt);
 
