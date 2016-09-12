@@ -183,6 +183,12 @@
 		qcom,gpio-tbl-flags = <1 1>;
 		qcom,gpio-tbl-label = "CCI_I2C_DATA0",
 				      "CCI_I2C_CLK0";
+		master0: qcom,cci-master0 {
+			status = "disabled";
+		};
+		master1: qcom,cci-master1 {
+			status = "disabled";
+		};
 		i2c_freq_100Khz: qcom,i2c_standard_mode {
 			status = "disabled";
 		};
@@ -198,6 +204,34 @@
 		};
 
 	};
+};
+
+&master0 {
+	qcom,hw-thigh = <20>;
+	qcom,hw-tlow = <28>;
+	qcom,hw-tsu-sto = <21>;
+	qcom,hw-tsu-sta = <21>;
+	qcom,hw-thd-dat = <13>;
+	qcom,hw-thd-sta = <18>;
+	qcom,hw-tbuf = <25>;
+	qcom,hw-scl-stretch-en = <0>;
+	qcom,hw-trdhld = <6>;
+	qcom,hw-tsp = <3>;
+	status = "ok";
+};
+
+&master1 {
+	qcom,hw-thigh = <20>;
+	qcom,hw-tlow = <28>;
+	qcom,hw-tsu-sto = <21>;
+	qcom,hw-tsu-sta = <21>;
+	qcom,hw-thd-dat = <13>;
+	qcom,hw-thd-sta = <18>;
+	qcom,hw-tbuf = <25>;
+	qcom,hw-scl-stretch-en = <0>;
+	qcom,hw-trdhld = <6>;
+	qcom,hw-tsp = <3>;
+	status = "ok";
 };
 
 &i2c_freq_100Khz {

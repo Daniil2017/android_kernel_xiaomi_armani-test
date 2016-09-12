@@ -13,7 +13,6 @@
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/string.h>
-#include <linux/sysdev.h>
 #include <asm/setup.h>
 #include <asm/bootinfo.h>
 #include <linux/bitops.h>
