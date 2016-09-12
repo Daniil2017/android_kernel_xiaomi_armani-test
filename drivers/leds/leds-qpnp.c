@@ -31,6 +31,7 @@
 #define WLED_IDAC_DLY_REG(base, n)	(WLED_MOD_EN_REG(base, n) + 0x01)
 #define WLED_FULL_SCALE_REG(base, n)	(WLED_IDAC_DLY_REG(base, n) + 0x01)
 #define WLED_MOD_SRC_SEL_REG(base, n)	(WLED_FULL_SCALE_REG(base, n) + 0x01)
+#define WLED_CABC_EN_REG(base, n)	(WLED_FULL_SCALE_REG(base, n) + 0x04)
 
 /* wled control registers */
 #define WLED_OVP_INT_STATUS(base)		(base + 0x10)
@@ -81,6 +82,8 @@
 #define WLED_4_BIT_MASK			0x0F
 #define WLED_8_BIT_SHFT			0x08
 #define WLED_MAX_DUTY_CYCLE		0xFFF
+#define WLED_SCALE_VAL			0x4
+#define WLED_SCALE_THRESHOLD		512
 
 #define WLED_SYNC_VAL			0x07
 #define WLED_SYNC_RESET_VAL		0x00
@@ -388,6 +391,7 @@ struct wled_config_data {
 	u8	switch_freq;
 	u8	op_fdbck;
 	u8	pmic_version;
+	bool	cabc_en; 
 	bool	dig_mod_gen_en;
 	bool	cs_out_en;
 };
@@ -619,6 +623,7 @@ static int qpnp_wled_sync(struct qpnp_led_data *led)
 	}
 
 	val = WLED_SYNC_RESET_VAL;
+        mdelay(1);
 	rc = spmi_ext_register_writel(led->spmi_dev->ctrl, led->spmi_dev->sid,
 		WLED_SYNC_REG(led->base), &val, 1);
 	if (rc) {
@@ -631,7 +636,8 @@ static int qpnp_wled_sync(struct qpnp_led_data *led)
 
 static int qpnp_wled_set(struct qpnp_led_data *led)
 {
-	int rc, duty, level, tries = 0;
+	static int max_current, digital;
+	int rc, duty = 0, level, tries = 0, scale_ratio = WLED_SCALE_VAL;
 	u8 val, i, num_wled_strings, sink_val, ilim_val, ovp_val;
 
 	num_wled_strings = led->wled_cfg->num_strings;
@@ -817,19 +823,72 @@ static int qpnp_wled_set(struct qpnp_led_data *led)
 			return rc;
 		}
 
+		digital = 0;
+		max_current = 0;
+
+	} else if (level < WLED_SCALE_THRESHOLD) {
+		if (max_current != led->max_current/scale_ratio) {
+			max_current = led->max_current/scale_ratio;
+			dev_info(&led->spmi_dev->dev, "bl: change to lower light %d\n", level);
+			for (i = 0; i < num_wled_strings; i++) {
+				rc = qpnp_led_masked_write(led,
+						WLED_FULL_SCALE_REG(led->base, i),
+						WLED_MAX_CURR_MASK, max_current);
+				if (rc) {
+					dev_err(&led->spmi_dev->dev,
+							"Write max current failure (%d)\n",
+							rc);
+					return rc;
+				}
+			}
+		}
+
+		duty = (WLED_MAX_DUTY_CYCLE * level * scale_ratio) / WLED_MAX_LEVEL;
+		if (digital != 2) {		//1 - analog  2 - digital
+			dev_info(&led->spmi_dev->dev, "bl: change to digital %d\n", level);
+			val = WLED_BOOST_ON;
+			rc = spmi_ext_register_writel(led->spmi_dev->ctrl,
+					led->spmi_dev->sid, WLED_MOD_CTRL_REG(led->base),
+					&val, 1);
+			if (rc) {
+				dev_err(&led->spmi_dev->dev,
+						"WLED write ctrl reg failed(%d)\n", rc);
+				return rc;
+			}
+			digital = 2;
+		}
 	} else {
-		val = WLED_BOOST_ON;
-		rc = spmi_ext_register_writel(led->spmi_dev->ctrl,
-			led->spmi_dev->sid, WLED_MOD_CTRL_REG(led->base),
-			&val, 1);
-		if (rc) {
-			dev_err(&led->spmi_dev->dev,
-				"WLED write ctrl reg failed(%d)\n", rc);
-			return rc;
+		if (max_current != led->max_current) {
+			max_current = led->max_current;
+			dev_info(&led->spmi_dev->dev, "bl: change to higher light %d\n", level);
+			for (i = 0; i < num_wled_strings; i++) {
+				rc = qpnp_led_masked_write(led,
+						WLED_FULL_SCALE_REG(led->base, i),
+						WLED_MAX_CURR_MASK, max_current);
+				if (rc) {
+					dev_err(&led->spmi_dev->dev,
+							"Write max current failure (%d)\n",
+							rc);
+					return rc;
+				}
+			}
+		}
+
+		duty = (WLED_MAX_DUTY_CYCLE * level) / WLED_MAX_LEVEL;
+		if (digital != 1) {
+			dev_info(&led->spmi_dev->dev, "bl: change to analog %d\n", level);
+			val = WLED_BOOST_ON;
+			rc = spmi_ext_register_writel(led->spmi_dev->ctrl,
+					led->spmi_dev->sid, WLED_MOD_CTRL_REG(led->base),
+					&val, 1);
+			if (rc) {
+				dev_err(&led->spmi_dev->dev,
+						"WLED write ctrl reg failed(%d)\n", rc);
+				return rc;
+			}
+			digital = 1;
 		}
 	}
-
-	duty = (WLED_MAX_DUTY_CYCLE * level) / WLED_MAX_LEVEL;
 
 	/* program brightness control registers */
 	for (i = 0; i < num_wled_strings; i++) {
@@ -2065,6 +2124,16 @@ static int qpnp_wled_init(struct qpnp_led_data *led)
 			}
 		}
 
+		if (led->wled_cfg->cabc_en) {
+			rc = qpnp_led_masked_write(led,
+				WLED_CABC_EN_REG(led->base, i),
+				WLED_NO_MASK, WLED_EN_MASK);
+			if (rc) {
+				dev_err(&led->spmi_dev->dev,
+				"WLED cabc en reg write failed(%d)\n", rc);
+			}
+		}
+
 		rc = qpnp_led_masked_write(led,
 			WLED_FULL_SCALE_REG(led->base, i), WLED_MAX_CURR_MASK,
 			(u8)led->max_current);
@@ -3190,6 +3259,9 @@ static int qpnp_get_config_wled(struct qpnp_led_data *led,
 
 	led->wled_cfg->cs_out_en =
 		of_property_read_bool(node, "qcom,cs-out-en");
+
+	led->wled_cfg->cabc_en =
+		of_property_read_bool(node, "qcom,cabc-en");
 
 	return 0;
 }
