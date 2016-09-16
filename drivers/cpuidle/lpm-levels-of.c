@@ -600,7 +600,7 @@ static int get_cpumask_for_node(struct device_node *node, struct cpumask *mask)
 
 static int parse_cpu_levels(struct device_node *node, struct lpm_cluster *c)
 {
-	struct device_node *n;
+	struct device_node *n = NULL;
 	int ret = -ENOMEM;
 	int i;
 	char *key;

@@ -2038,6 +2038,10 @@ void extract_cal_data(int len)
 	int rc;
 	struct cal_data_params calhdr;
 	unsigned char fw_status = WCNSS_RESP_FAIL;
+	calhdr.frag_number = 0;
+	calhdr.frag_size = 0;
+	calhdr.msg_flags = 0;
+	calhdr.total_size = 0;
 
 	if (len < sizeof(struct cal_data_params)) {
 		pr_err("wcnss: incomplete cal header length\n");

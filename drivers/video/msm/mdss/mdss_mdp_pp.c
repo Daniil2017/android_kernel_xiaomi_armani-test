@@ -3386,7 +3386,7 @@ static void pp_update_hist_lut(char __iomem *addr,
 				struct mdp_hist_lut_data *cfg)
 {
 	int i;
-	char *offset_data, *offset_swap, *offset_pa_dither;
+	char *offset_data, *offset_swap, *offset_pa_dither = NULL;
 	u32 data, pa_dither_data;
 
 	if (PP_LOCAT(cfg->block) == MDSS_PP_DSPP_CFG) {

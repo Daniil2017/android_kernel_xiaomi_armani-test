@@ -656,18 +656,18 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
 void __init early_init_dt_check_for_hw_version(unsigned long node)
 {
 	unsigned long hw_version;
- 	int len;
+	int len;
 	const __be32 *prop;
 
 	pr_debug("Looking for hw version properties... \n");
 	prop = of_get_flat_dt_prop(node, "hwversion", &len);
-	pr_debug("len=%lu\n", len);
+	pr_debug("len=%d\n", len);
 	if (!prop)
 		return;
 
 	hw_version = of_read_ulong(prop, len / 4);
 	early_init_dt_setup_hwversion_arch(hw_version);
-	pr_debug("hw version %lu\n", hw_version);
+	pr_info("hw version %lu\n", hw_version);
 }
 
 void __init early_init_dt_check_for_powerup_reason(unsigned long node)
