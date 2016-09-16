@@ -3,4 +3,4 @@ Experimental kernel 3.10.84 for Xiaomi Red Rice 1S(Redmi 1S, armani)
 DO NOT USE!!! KERNEL IS NOT WORKING!!!
 
 
-LLCON: androidboot.llcon=2,100,0,0x03200000,24,1280,720,720,8,0xFFFFFF
+LLCON: androidboot.llcon=1,100,0,0x03200000,24,1280,720,720,8,0xFFFFFF
